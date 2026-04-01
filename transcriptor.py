@@ -5,23 +5,15 @@ import time
 import numpy as np
 import soundfile as sf
 from datetime import datetime
+from config import (
+    AUDIO_DIR, TRANSCRIPT_FILE, MODELO_WHISPER, IDIOMA,
+    UMBRAL_SILENCIO, UMBRAL_NO_SPEECH
+)
+from logger import get_logger
 
-# ── Configuración ──────────────────────────────
-AUDIO_DIR       = os.path.expanduser("~/lobster/audio_chunks")
-TRANSCRIPT_DIR  = os.path.expanduser("~/lobster")
-TRANSCRIPT_FILE = os.path.join(TRANSCRIPT_DIR, "transcript.txt")
-MODELO_WHISPER  = "small"
-IDIOMA          = None
-
-UMBRAL_SILENCIO  = 0.01   # bajar a 0.005 si corta voz real
-UMBRAL_NO_SPEECH = 0.6    # prob. mínima de silencio para descartar
+# ── Setup ───────────────────────────────────────
+log = get_logger("transcriptor")
 # ───────────────────────────────────────────────
-
-print("[transcriptor] 🦞 Cargando modelo Whisper...")
-modelo = whisper.load_model(MODELO_WHISPER)
-print("[transcriptor] Modelo listo.")
-
-procesados = set()
 
 FRASES_BASURA = {
     "you", "thank you", "thanks", "thanks for watching",
@@ -29,18 +21,24 @@ FRASES_BASURA = {
     "subtitles by", "subtítulos por", "amara.org",
 }
 
+log.info("Cargando modelo Whisper...")
+modelo = whisper.load_model(MODELO_WHISPER)
+log.info("Modelo listo.")
+
+procesados = set()
+
 def es_silencio(archivo):
     try:
         datos, _ = sf.read(archivo, dtype="float32")
         rms = np.sqrt(np.mean(datos ** 2))
-        print(f"[transcriptor] RMS: {rms:.5f} (umbral: {UMBRAL_SILENCIO})")
+        log.debug(f"RMS: {rms:.5f} (umbral: {UMBRAL_SILENCIO})")
         return rms < UMBRAL_SILENCIO
     except Exception as e:
-        print(f"[transcriptor] ⚠️ Error leyendo audio para RMS: {e}")
+        log.warning(f"No se pudo leer el audio para RMS: {e}")
         return False
 
 def transcribir_chunk(archivo):
-    print(f"[transcriptor] Transcribiendo: {archivo}")
+    log.info(f"Transcribiendo: {archivo}")
     resultado = modelo.transcribe(
         archivo,
         language=IDIOMA,
@@ -52,25 +50,25 @@ def transcribir_chunk(archivo):
     )
     texto = resultado["text"].strip()
     if texto.lower() in FRASES_BASURA:
-        print(f"[transcriptor] 🚫 Alucinación descartada: {repr(texto)}")
+        log.warning(f"Alucinación descartada: {repr(texto)}")
         return None
-    print(f"[transcriptor] Texto detectado: {repr(texto)}")
+    log.info(f"Texto detectado: {repr(texto)}")
     return texto
 
 def guardar_en_transcript(texto):
     timestamp = datetime.now().strftime("%H:%M:%S")
     with open(TRANSCRIPT_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {texto}\n")
-    print(f"[transcriptor] ✅ Guardado en transcript.txt")
+    log.info("Guardado en transcript.txt")
 
 def iniciar():
-    print("[transcriptor] 🦞 Escuchando nuevos chunks de audio...")
+    log.info("🦞 Escuchando nuevos chunks de audio...")
     while True:
         chunks = sorted(glob.glob(f"{AUDIO_DIR}/chunk_*.wav"))
         nuevos = [c for c in chunks if c not in procesados]
         for chunk in nuevos:
             if es_silencio(chunk):
-                print(f"[transcriptor] 🔇 Silencio omitido: {chunk}")
+                log.debug(f"Chunk silencioso omitido: {chunk}")
                 procesados.add(chunk)
                 continue
             texto = transcribir_chunk(chunk)
