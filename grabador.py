@@ -4,47 +4,48 @@ import numpy as np
 import queue
 import os
 import time
-from datetime import datetime
+from config import (
+    DEVICE_INDEX, SAMPLE_RATE, CHANNELS,
+    CHUNK_SEGUNDOS, AUDIO_DIR
+)
+from logger import get_logger
 
-# ── Configuración ──────────────────────────────
-DEVICE_INDEX   = 4        # BlackHole 2ch — verificar con sd.query_devices()
-SAMPLE_RATE    = 16000
-CHANNELS       = 1        # CORREGIDO: mono, BlackHole 2ch lo soporta
-CHUNK_SEGUNDOS = 30
-OUTPUT_DIR     = os.path.expanduser("~/lobster/audio_chunks")
+# ── Setup ───────────────────────────────────────
+log = get_logger("grabador")
 # ───────────────────────────────────────────────
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
 audio_queue = queue.Queue()
 
 def callback(indata, frames, time, status):
     if status:
-        print(f"[grabador] ⚠️ Advertencia de stream: {status}")
+        log.warning(f"Advertencia de stream: {status}")
     audio_queue.put(indata.copy())
 
 def guardar_chunk(datos, indice):
+    from datetime import datetime
     timestamp = datetime.now().strftime("%H%M%S")
-    nombre = f"{OUTPUT_DIR}/chunk_{indice:04d}_{timestamp}.wav"
+    nombre = f"{AUDIO_DIR}/chunk_{indice:04d}_{timestamp}.wav"
     if datos.ndim == 2 and datos.shape[1] == 1:
         datos = datos[:, 0]
     sf.write(nombre, datos, SAMPLE_RATE)
-    print(f"[grabador] ✅ Guardado: {nombre}")
+    log.info(f"Guardado: {nombre}")
     return nombre
 
 def iniciar():
-    print("[grabador] 🦞 Iniciando captura de audio desde BlackHole...")
+    log.info("🦞 Iniciando captura de audio desde BlackHole...")
     indice = 0
     buffer = []
 
     while True:
         try:
-            print(f"[grabador] Abriendo stream en device={DEVICE_INDEX}, "
-                  f"{SAMPLE_RATE}Hz, {CHANNELS}ch...")
+            log.info(f"Abriendo stream — device={DEVICE_INDEX}, "
+                     f"{SAMPLE_RATE}Hz, {CHANNELS}ch...")
             with sd.InputStream(device=DEVICE_INDEX,
                                 samplerate=SAMPLE_RATE,
                                 channels=CHANNELS,
                                 callback=callback):
-                print("[grabador] ✅ Stream abierto correctamente")
+                log.info("Stream abierto correctamente")
                 while True:
                     try:
                         data = audio_queue.get(timeout=1)
@@ -59,11 +60,11 @@ def iniciar():
                         continue
 
         except KeyboardInterrupt:
-            print("\n[grabador] Detenido por el usuario.")
+            log.info("Detenido por el usuario.")
             break
         except Exception as e:
-            print(f"[grabador] ❌ Error en stream: {e}")
-            print("[grabador] 🔄 Reintentando en 5 segundos...")
+            log.error(f"Error en stream: {e}")
+            log.info("Reintentando en 5 segundos...")
             buffer = []
             time.sleep(5)
 
