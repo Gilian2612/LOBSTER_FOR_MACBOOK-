@@ -62,6 +62,7 @@ def desactivar_mic_camara():
     pyautogui.hotkey('command', 'shift', 'o')  # Apagar cámara
     print("[joiner] ✅ Mic y cámara desactivados")
 
+
 def iniciar_lobster():
     print("[joiner] 🦞 Iniciando módulos de grabación...")
     os.system("python3 ~/lobster/grabador.py &")

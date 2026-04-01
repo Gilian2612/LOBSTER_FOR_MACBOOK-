@@ -70,6 +70,7 @@ class VentanaLobster:
         self.btn_transcript.configure(bg="#313244", fg="#cdd6f4")
         self.refrescar()
 
+
     def mostrar_transcript(self):
         self.modo = "transcript"
         self.btn_transcript.configure(bg="#89b4fa", fg="#1e1e2e")
