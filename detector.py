@@ -2,17 +2,15 @@ import os
 import time
 import requests
 from datetime import datetime
+from config import (
+    TRANSCRIPT_FILE, RESPUESTAS_FILE, PALABRA_CLAVE,
+    OLLAMA_URL, MODELO_OLLAMA, CONTEXTO_LINEAS, OLLAMA_TIMEOUT
+)
+from logger import get_logger
 
-# ── Configuración ──────────────────────────────
-TRANSCRIPT_FILE  = os.path.expanduser("~/lobster/transcript.txt")
-RESPUESTAS_FILE  = os.path.expanduser("~/lobster/respuestas.txt")
-PALABRA_CLAVE    = "hey lobster"
-OLLAMA_URL       = "http://localhost:11434/api/generate"
-MODELO           = "qwen2.5-coder:14b"
-CONTEXTO_LINEAS  = 50
+# ── Setup ───────────────────────────────────────
+log = get_logger("detector")
 # ───────────────────────────────────────────────
-
-procesadas = set()
 
 def obtener_contexto():
     if not os.path.exists(TRANSCRIPT_FILE):
@@ -21,7 +19,7 @@ def obtener_contexto():
         lineas = f.readlines()
     return "".join(lineas[-CONTEXTO_LINEAS:])
 
-def preguntar_a_qwen(pregunta, contexto):
+def preguntar_a_ollama(pregunta, contexto):
     prompt = f"""Eres un asistente de reuniones llamado Lobster.
 Aqui esta la transcripcion reciente de la reunion:
 
@@ -31,13 +29,24 @@ Un participante pregunto: {pregunta}
 
 Responde de forma concisa y util en el mismo idioma de la pregunta."""
 
-    print(f"[detector] Consultando a Qwen...")
-    response = requests.post(OLLAMA_URL, json={
-        "model": MODELO,
-        "prompt": prompt,
-        "stream": False
-    })
-    return response.json()["response"]
+    log.info(f"Consultando a Ollama — pregunta: {repr(pregunta)}")
+    try:
+        response = requests.post(
+            OLLAMA_URL,
+            json={"model": MODELO_OLLAMA, "prompt": prompt, "stream": False},
+            timeout=OLLAMA_TIMEOUT
+        )
+        response.raise_for_status()
+        return response.json()["response"]
+    except requests.Timeout:
+        log.error("Ollama no respondió en el tiempo límite")
+        return "Lo siento, el modelo tardó demasiado en responder."
+    except requests.ConnectionError:
+        log.error("No se pudo conectar a Ollama — ¿está corriendo?")
+        return "Lo siento, no pude conectarme al modelo."
+    except Exception as e:
+        log.error(f"Error inesperado consultando Ollama: {e}")
+        return "Lo siento, ocurrió un error al procesar tu pregunta."
 
 def guardar_respuesta(pregunta, respuesta):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -45,10 +54,10 @@ def guardar_respuesta(pregunta, respuesta):
         f.write(f"\n[{timestamp}] PREGUNTA: {pregunta}\n")
         f.write(f"[{timestamp}] LOBSTER: {respuesta}\n")
         f.write("-" * 50 + "\n")
-    print(f"[detector] Respuesta guardada en respuestas.txt")
+    log.info("Respuesta guardada en respuestas.txt")
 
 def iniciar():
-    print("[detector] Escuchando por Hey Lobster...")
+    log.info("🦞 Escuchando por Hey Lobster...")
     ultima_linea = 0
 
     while True:
@@ -62,8 +71,8 @@ def iniciar():
                     partes = linea.lower().split(PALABRA_CLAVE, 1)
                     pregunta = partes[1].strip() if len(partes) > 1 else "resume la reunion"
                     contexto = obtener_contexto()
-                    respuesta = preguntar_a_qwen(pregunta, contexto)
-                    print(f"\n[detector] LOBSTER DICE:\n{respuesta}\n")
+                    respuesta = preguntar_a_ollama(pregunta, contexto)
+                    log.info(f"LOBSTER DICE: {respuesta}")
                     guardar_respuesta(pregunta, respuesta)
 
             ultima_linea = len(lineas)
