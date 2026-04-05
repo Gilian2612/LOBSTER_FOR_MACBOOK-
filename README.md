@@ -94,3 +94,12 @@ Todo está centralizado en `config.py`. Los valores que más vas a necesitar cam
 - [ ] Calibrar `UMBRAL_SILENCIO` según el ambiente de grabación
 - [ ] Verificar `DEVICE_INDEX` de BlackHole después de cada reinicio de la Mac
 - [ ] Unificar `programador.py` con `teams_joiner.py` (pendiente de siguiente sesión)
+
+
+
+
+
+
+REFACTOR SOLICITUD - REQUERIMIENTO:
+- Permitir que el Lobster se pueda unir a la reunion (invitado por un miemrbo del equipo)
+
