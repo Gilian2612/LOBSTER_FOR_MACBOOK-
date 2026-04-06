@@ -1,6 +1,7 @@
 # 🦞 Hey Lobster
 
-Asistente de reuniones autónomo para Mac. Entra solo a Teams, graba, transcribe, responde comandos de voz y genera resúmenes automáticos.
+Asistente de reuniones autónomo para Mac. Entra solo a Teams, graba, transcribe, responde comandos de voz y genera resúmenes automáticos. (EXPERIMENTAL)
+Diseño sigue en proceso
 
 ---
 
